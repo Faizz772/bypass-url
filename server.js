@@ -4,6 +4,7 @@ const http = require("node:http");
 const fs = require("node:fs");
 const path = require("node:path");
 const apiHandler = require("./api/index");
+const jobHandler = require("./api/job");
 
 const PORT = Number(process.env.PORT || 3000);
 const PUBLIC_DIR = path.join(__dirname, "public");
@@ -21,6 +22,10 @@ const MIME = {
 const server = http.createServer((req, res) => {
   const url = new URL(req.url, `http://${req.headers.host || "localhost"}`);
 
+  if (url.pathname === "/api/job") {
+    jobHandler(req, res);
+    return;
+  }
   if (url.pathname === "/api" || url.pathname.startsWith("/api/")) {
     apiHandler(req, res);
     return;

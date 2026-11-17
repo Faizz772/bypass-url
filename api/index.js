@@ -39,11 +39,9 @@ function sendJson(res, status, payload) {
   res.end(JSON.stringify(payload));
 }
 
-async function resolveRequest(req) {
+function parse(req) {
   const u = new URL(req.url, `http://${req.headers.host || "localhost"}`);
-  if (!u.pathname.startsWith("/api")) {
-    return { status: 404, payload: { status: false, error: "Gunakan /api/mgvt atau /api/umpc." } };
-  }
+  if (!u.pathname.startsWith("/api")) return { error: 404 };
 
   const target = u.searchParams.get("url");
   const engineParam = u.searchParams.get("engine") || "";
@@ -52,6 +50,14 @@ async function resolveRequest(req) {
   let engine = pathEngine && ENGINES[pathEngine] ? pathEngine : "";
   if (!engine && engineParam && ENGINES[engineParam]) engine = engineParam;
   if (!engine && target) engine = pickEngine(target);
+  return { target, engine };
+}
+
+async function resolveRequest(req) {
+  const { target, engine, error } = parse(req);
+  if (error === 404) {
+    return { status: 404, payload: { status: false, error: "Gunakan /api/mgvt atau /api/umpc." } };
+  }
 
   if (!target) {
     return {
@@ -93,3 +99,5 @@ module.exports.handle = handle;
 module.exports.default = handle;
 module.exports.resolveRequest = resolveRequest;
 module.exports.pickEngine = pickEngine;
+module.exports.parse = parse;
+module.exports.ENGINES = ENGINES;
