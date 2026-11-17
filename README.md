@@ -70,8 +70,7 @@ vercel --prod
 
 ```
 api/
-  index.js     router + deteksi engine (juga dipakai server.js)
-  index.mjs    adapter handler Vercel
+  index.js     router + deteksi engine (dipakai server.js dan Vercel)
   mgvt.js      engine safelinku (sfl.gl)
   umpc.js      engine bicolink (+ fallback worker Python)
 public/

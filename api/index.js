@@ -88,5 +88,8 @@ async function handle(req, res) {
 
 module.exports = handle;
 module.exports.handle = handle;
+
+// Vercel Node runtime (ESM style) membaca default export, Node lokal membaca module.exports.
+module.exports.default = handle;
 module.exports.resolveRequest = resolveRequest;
 module.exports.pickEngine = pickEngine;
