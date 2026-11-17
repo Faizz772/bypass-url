@@ -94,6 +94,8 @@ server.js      server statis + API untuk lokal
 
 ## Credit
 
+Web app dan API dibuat oleh **Xenox**.
+
 Engine di port dari skrip milik **JH a.k.a Dhika** (safelinku, `mgvt`) dan **JAMVANHAX0R** (bicolink, `umpc`).
 Credit di dalam file engine tidak dihapus. Kalau kamu memodifikasi engine, pertahankan bagian credit-nya.
 
