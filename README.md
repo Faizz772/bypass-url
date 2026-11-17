@@ -19,27 +19,15 @@ node server.js            # tanpa dependency, Node 18+
 # buka http://localhost:3000
 ```
 
-`python3` opsional, hanya dipakai kalau kamu mengaktifkan mode `--python`/proxy pada engine bicolink. Tanpa python3 semua fitur utama tetap jalan.
+`python3` hanya dipakai kalau kamu menjalankan engine bicolink dengan opsi `--python` atau proxy. Fitur utama jalan tanpa python3.
 
 ## API
-
-Sinkron (cocok untuk curl, dipakai engine safelink):
 
 ```http
 GET /api/mgvt?url=https://sfl.gl/gOfplaB
 GET /api/umpc?url=https://bicolink.com/wFFcZL
-GET /api?url=<link>&engine=auto
+GET /api?url=<link>              (engine ditebak dari hostname)
 ```
-
-Mode job (dipakai halaman untuk bicolink supaya tidak kena batas waktu fungsi serverless):
-
-```http
-POST /api/job?url=https://bicolink.com/wFFcZL   -> 202 { "id": "...", "status": "running" }
-GET  /api/job?id=<id>                           -> { "status": "running" | "done" | "error" }
-```
-
-Catatan: job disimpan di memori instance serverless, jadi kalau instance berpindah saat polling, endpoint
-membalas 404 dan halaman menampilkan pesan untuk mengulang. Di `server.js` (lokal) memori itu konsisten.
 
 Contoh balasan sukses:
 
@@ -69,7 +57,11 @@ curl "http://localhost:3000/api?url=https%3A%2F%2Fsfl.gl%2FgOfplaB"
 3. Framework preset: **Other**. Build command kosong, output directory kosong.
 4. Deploy. Halaman utama otomatis tersaji dari folder `public/`, API dari `api/`.
 
-`vercel.json` sudah menyetel `maxDuration` 60 detik karena safelink punya jeda verifikasi sekitar 20 detik.
+`vercel.json` menyetel `maxDuration` 60 detik karena safelink butuh sekitar 20 detik (ada jeda verifikasi).
+
+Safelink cocok untuk deployment serverless. Bicolink lebih berat dan bergantung Cloudflare: di lingkungan
+Vercel yang IP-nya dinilai rendah request bisa ditolak (403) atau melewati 60 detik. Untuk hasil paling stabil,
+jalankan engine bicolink di VPS/server sendiri lewat `node server.js`.
 
 Alternatif cepat:
 
@@ -82,10 +74,9 @@ vercel --prod
 
 ```
 api/
-  index.js     router + deteksi engine (dipakai server.js dan Vercel)
-  job.js       mode job + polling untuk proses yang panjang
-  mgvt.js      engine safelinku (sfl.gl)
-  umpc.js      engine bicolink (+ fallback worker Python)
+  index.js     router otomatis untuk /api?url=
+  mgvt.js      engine safelinku (sfl.gl), handler /api/mgvt
+  umpc.js      engine bicolink, handler /api/umpc
 public/
   index.html   UI
   styles.css   tema terang/gelap, mobile first

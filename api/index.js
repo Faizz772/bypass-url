@@ -11,15 +11,20 @@
 const mgvt = require("./mgvt");
 const umpc = require("./umpc");
 
-const ENGINE_BY_HOST = [
-  { test: /(^|\.)sfl\.gl$/i, engine: "mgvt" },
-  { test: /(^|\.)bicolink\.com$/i, engine: "umpc" },
-];
+/*
+ * Router otomatis untuk /api?url=...
+ * Engine spesifik punya endpoint sendiri: /api/mgvt dan /api/umpc.
+ */
 
 const ENGINES = {
-  mgvt: { run: (u) => mgvt.bypass(u), label: "safelink (sfl.gl)" },
-  umpc: { run: (u, o) => umpc.bypass(u, o), label: "bicolink" },
+  mgvt: { run: (u, o) => mgvt.bypass(u, o) },
+  umpc: { run: (u, o) => umpc.bypass(u, o) },
 };
+
+const HOSTS = [
+  { test: /(^|\.)sfl\.gl$/i, engine: "mgvt" },
+  { test: /(^|\.)(bicolink\.com|bico\.link)$/i, engine: "umpc" },
+];
 
 function pickEngine(url) {
   let host = "";
@@ -28,36 +33,15 @@ function pickEngine(url) {
   } catch (e) {
     return null;
   }
-  const hit = ENGINE_BY_HOST.find((e) => e.test.test(host));
+  const hit = HOSTS.find((e) => e.test.test(host));
   return hit ? hit.engine : null;
 }
 
-function sendJson(res, status, payload) {
-  res.statusCode = status;
-  res.setHeader("Content-Type", "application/json; charset=utf-8");
-  res.setHeader("Cache-Control", "no-store");
-  res.end(JSON.stringify(payload));
-}
-
-function parse(req) {
-  const u = new URL(req.url, `http://${req.headers.host || "localhost"}`);
-  if (!u.pathname.startsWith("/api")) return { error: 404 };
-
-  const target = u.searchParams.get("url");
-  const engineParam = u.searchParams.get("engine") || "";
-  const pathEngine = u.pathname.split("/")[2] || "";
-
-  let engine = pathEngine && ENGINES[pathEngine] ? pathEngine : "";
-  if (!engine && engineParam && ENGINES[engineParam]) engine = engineParam;
-  if (!engine && target) engine = pickEngine(target);
-  return { target, engine };
-}
-
 async function resolveRequest(req) {
-  const { target, engine, error } = parse(req);
-  if (error === 404) {
-    return { status: 404, payload: { status: false, error: "Gunakan /api/mgvt atau /api/umpc." } };
-  }
+  const u = new URL(req.url, `http://${req.headers.host || "localhost"}`);
+  const target = u.searchParams.get("url");
+  const forced = u.searchParams.get("engine") || "";
+  const engine = forced && ENGINES[forced] ? forced : target ? pickEngine(target) : null;
 
   if (!target) {
     return {
@@ -65,7 +49,7 @@ async function resolveRequest(req) {
       payload: {
         status: false,
         error: "Parameter url wajib diisi.",
-        engines: Object.entries(ENGINES).map(([k, v]) => ({ id: k, label: v.label })),
+        engines: ["mgvt", "umpc"],
       },
     };
   }
@@ -74,7 +58,7 @@ async function resolveRequest(req) {
       status: 422,
       payload: {
         status: false,
-        error: "Engine tidak dikenal untuk host tersebut. Pakai ?engine=mgvt atau ?engine=umpc.",
+        error: "Engine tidak dikenal untuk host tersebut. Pakai /api/mgvt, /api/umpc, atau ?engine=mgvt|umpc.",
       },
     };
   }
@@ -85,6 +69,13 @@ async function resolveRequest(req) {
   } catch (e) {
     return { status: 500, payload: { status: false, error: (e && e.message) || "Internal error" } };
   }
+}
+
+function sendJson(res, status, payload) {
+  res.statusCode = status;
+  res.setHeader("Content-Type", "application/json; charset=utf-8");
+  res.setHeader("Cache-Control", "no-store");
+  res.end(JSON.stringify(payload));
 }
 
 async function handle(req, res) {
@@ -99,5 +90,4 @@ module.exports.handle = handle;
 module.exports.default = handle;
 module.exports.resolveRequest = resolveRequest;
 module.exports.pickEngine = pickEngine;
-module.exports.parse = parse;
 module.exports.ENGINES = ENGINES;

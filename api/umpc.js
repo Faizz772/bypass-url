@@ -18,6 +18,15 @@ const DEFAULT_TIMEOUT_MS = 90000;
 
 const delay = (ms) => new Promise((r) => setTimeout(r, ms));
 
+async function directHandler(req, res) {
+  const target = new URL(req.url, "http://x").searchParams.get("url") || "";
+  res.setHeader("Content-Type", "application/json; charset=utf-8");
+  res.setHeader("Cache-Control", "no-store");
+  const result = await bypassBicolink(target, {});
+  res.statusCode = result.status ? 200 : 502;
+  res.end(JSON.stringify(result));
+}
+
 function assertBicolink(url) {
   let host = "";
   try {
@@ -643,7 +652,7 @@ async function bypassBicolink(url, options = {}) {
   return result;
 }
 
-module.exports = { bypass: bypassBicolink, CREDIT };
+module.exports = { bypass: bypassBicolink, CREDIT, directHandler };
 
 if (require.main === module) {
   const target = process.argv[2] || "https://bicolink.com/wFFcZL";
@@ -653,4 +662,5 @@ if (require.main === module) {
   });
 }
 
-module.exports.default = module.exports.bypass;
+module.exports.default = directHandler;
+module.exports.handler = directHandler;

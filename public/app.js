@@ -27,11 +27,10 @@
   var busy = false;
   var timer = null;
   var ticker = null;
-  var JOB_LIMIT_MS = 55000;
 
   var ENGINES = [
     { id: "mgvt", label: "safelink", test: /(^|\.)sfl\.gl$/i, endpoint: "/api/mgvt", mode: "sync" },
-    { id: "umpc", label: "bicolink", test: /(^|\.)bicolink\.com$/i, endpoint: "/api/job", mode: "job" },
+    { id: "umpc", label: "bicolink", test: /(^|\.)bicolink\.com$/i, endpoint: "/api/umpc", mode: "sync" },
   ];
 
   function detect(raw) {
@@ -176,47 +175,6 @@
     }
   }
 
-  async function runJob(engine, url) {
-    var res = await fetch(engine.endpoint + "?url=" + encodeURIComponent(url), {
-      method: "POST",
-      headers: { Accept: "application/json" },
-    });
-    var started = parseJson(res, await res.text());
-    if (!res.ok || !started.id) {
-      renderError(started);
-      return;
-    }
-
-    while (Date.now() - startedAt < JOB_LIMIT_MS) {
-      await new Promise(function (r) {
-        setTimeout(r, 1500);
-      });
-      var job = null;
-      try {
-        var poll = await fetch("/api/job?id=" + encodeURIComponent(started.id), {
-          headers: { Accept: "application/json" },
-        });
-        job = parseJson(poll, await poll.text());
-      } catch (e) {
-        job = { status: "error", error: "Koneksi ke server terputus: " + e.message };
-      }
-
-      if (job.status === "done") {
-        setSteps(stepItems.length);
-        renderDone(job.data.data, job.source);
-        return;
-      }
-      if (job.status === "error") {
-        renderError(job);
-        return;
-      }
-    }
-    renderError({
-      error:
-        "Proses melewati batas waktu di server. Link bicolink yang macet atau butuh verifikasi lebih lama akan gagal seperti ini, coba lagi nanti.",
-    });
-  }
-
   async function run(url) {
     var engine = detect(url);
     if (!engine) {
@@ -236,11 +194,7 @@
     advanceSteps();
 
     try {
-      if (engine.mode === "job") {
-        await runJob(engine, url);
-      } else {
-        await runSync(engine, url);
-      }
+      await runSync(engine, url);
     } catch (e) {
       renderError({ error: "Tidak bisa menghubungi server: " + e.message });
     } finally {

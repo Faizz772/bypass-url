@@ -383,6 +383,15 @@ async function bypass(input) {
   return result;
 }
 
-module.exports = { bypass, CREDIT };
+async function directHandler(req, res) {
+  const target = new URL(req.url, "http://x").searchParams.get("url") || "";
+  res.setHeader("Content-Type", "application/json; charset=utf-8");
+  res.setHeader("Cache-Control", "no-store");
+  const result = await bypass(target);
+  res.statusCode = result.status ? 200 : 502;
+  res.end(JSON.stringify(result));
+}
 
-module.exports.default = module.exports.bypass;
+module.exports = { bypass, CREDIT, directHandler };
+
+module.exports.default = directHandler;
