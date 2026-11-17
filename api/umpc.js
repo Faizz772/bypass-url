@@ -597,3 +597,5 @@ if (require.main === module) {
     process.exitCode = r.status ? 0 : 1;
   });
 }
+
+module.exports.default = module.exports.bypass;

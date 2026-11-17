@@ -384,3 +384,5 @@ async function bypass(input) {
 }
 
 module.exports = { bypass, CREDIT };
+
+module.exports.default = module.exports.bypass;
