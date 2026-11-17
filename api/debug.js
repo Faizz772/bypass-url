@@ -34,6 +34,17 @@ module.exports = async function handler(req, res) {
     req2.end();
   });
 
+  const t2 = Date.now();
+  out.engine = await Promise.race([
+    umpc.bypass("https://bicolink.com/wFFcZL").then((r) => ({
+      status: r.status,
+      error: r.error,
+      ms: r.execution_time_ms,
+      steps: (r.trace || (r.data && r.data.steps) || []).slice(-6),
+    })),
+    new Promise((resolve) => setTimeout(() => resolve({ hung: true, ms: Date.now() - t2 }), 45000)),
+  ]);
+
   res.statusCode = 200;
   res.setHeader("Content-Type", "application/json");
   res.end(JSON.stringify(out));
