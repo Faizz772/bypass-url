@@ -12,7 +12,7 @@ const UA =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
 const MAX_REDIRECTS = 10;
 const MAX_PASSES = 15;
-const GO_FORM_DELAY_MS = 5500;
+const GO_FORM_DELAY_MS = 3000;
 const PER_REQUEST_CAP_MS = 45000;
 const DEFAULT_TIMEOUT_MS = 90000;
 
@@ -373,7 +373,7 @@ async function request(ctx, url, opts = {}) {
 
     const r = await perform(ctx, current, method, body, headers, Math.min(remaining, PER_REQUEST_CAP_MS));
     ctx.jar.storeFromResponse(r, current);
-    ctx.trace.push(`${method} ${current.slice(0, 90)} -> ${r.status}`);
+    ctx.trace.push(`${method} ${current.slice(0, 90)} -> ${r.status} [${ctx.transport}]`);
 
     if ([301, 302, 303, 307, 308].includes(r.status)) {
       const loc = r.headers.get("location");
@@ -522,8 +522,10 @@ async function bypassBicolink(url, options = {}) {
       if (goForm) {
         const action = new URL(goForm.action || page.url, page.url).href;
         const body = new URLSearchParams(goForm.fields);
-        await delay(GO_FORM_DELAY_MS);
-        while (!bypassedUrl && Date.now() < ctx.deadline) {
+        let attempts = 0;
+        await delay(Math.min(GO_FORM_DELAY_MS, Math.max(0, ctx.deadline - Date.now() - 8000)));
+        while (!bypassedUrl && Date.now() < ctx.deadline && attempts < 6) {
+          attempts++;
           const { res } = await request(ctx, action, {
             method: "POST",
             body,
@@ -542,7 +544,7 @@ async function bypassBicolink(url, options = {}) {
             bypassedUrl = data.url;
             break;
           }
-          await delay(2000);
+          await delay(1200);
         }
         break;
       }
@@ -559,7 +561,7 @@ async function bypassBicolink(url, options = {}) {
         continue;
       }
 
-      await delay(1000);
+      await delay(600);
       page = await getPage(ctx, page.url, page.url);
     }
 
