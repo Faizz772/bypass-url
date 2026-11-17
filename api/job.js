@@ -62,7 +62,7 @@ function start(target, engine, options) {
 }
 
 function view(job) {
-  const out = { id: job.id, status: job.status };
+  const out = { id: job.id, status: job.status, touched: job.touched, age_ms: Date.now() - job.created };
   if (job.status === "done") {
     out.data = job.data.data;
     out.source = job.data.source;
