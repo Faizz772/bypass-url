@@ -164,11 +164,13 @@
         <ul>
           <li>Link yang memakai captcha atau passcode tidak bisa diproses otomatis, dan halaman ini akan bilang terus terang.</li>
           <li>Struktur halaman safelink bisa berubah kapan saja. Kalau engine berhenti menemukan gate, hasilnya error, bukan URL palsu.</li>
+          <li>Bicolink dilindungi Cloudflare. Kalau IP server sedang dinilai rendah, prosesnya ditolak di awal dengan pesan jelas, bukan menggantung.</li>
           <li>Semua proses jalan di server. Link yang kamu tempel tidak disimpan di database mana pun.</li>
           <li>
             Bisa juga dipanggil langsung lewat API:
-            <code>GET /api/mgvt?url=</code> untuk safelink, <code>GET /api/umpc?url=</code> untuk bicolink, atau
-            <code>GET /api?url=</code> agar engine ditebak dari hostname. Balasannya JSON.
+            <code>GET /api/mgvt?url=</code> untuk safelink, <code>GET /api?url=</code> agar engine ditebak dari
+            hostname, dan <code>POST /api/job?url=</code> lalu <code>GET /api/job?id=</code> untuk proses panjang.
+            Balasannya JSON.
           </li>
         </ul>
       </section>

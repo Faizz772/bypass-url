@@ -19,15 +19,27 @@ node server.js            # tanpa dependency, Node 18+
 # buka http://localhost:3000
 ```
 
-Butuh `python3` di server hanya kalau suatu situs memakai challenge Cloudflare; tanpa python3 kode tetap jalan untuk situs biasa. Di Termux: `pkg install python`.
+`python3` opsional, hanya dipakai kalau kamu mengaktifkan mode `--python`/proxy pada engine bicolink. Tanpa python3 semua fitur utama tetap jalan.
 
 ## API
+
+Sinkron (cocok untuk curl, dipakai engine safelink):
 
 ```http
 GET /api/mgvt?url=https://sfl.gl/gOfplaB
 GET /api/umpc?url=https://bicolink.com/wFFcZL
 GET /api?url=<link>&engine=auto
 ```
+
+Mode job (dipakai halaman untuk bicolink supaya tidak kena batas waktu fungsi serverless):
+
+```http
+POST /api/job?url=https://bicolink.com/wFFcZL   -> 202 { "id": "...", "status": "running" }
+GET  /api/job?id=<id>                           -> { "status": "running" | "done" | "error" }
+```
+
+Catatan: job disimpan di memori instance serverless, jadi kalau instance berpindah saat polling, endpoint
+membalas 404 dan halaman menampilkan pesan untuk mengulang. Di `server.js` (lokal) memori itu konsisten.
 
 Contoh balasan sukses:
 
@@ -71,6 +83,7 @@ vercel --prod
 ```
 api/
   index.js     router + deteksi engine (dipakai server.js dan Vercel)
+  job.js       mode job + polling untuk proses yang panjang
   mgvt.js      engine safelinku (sfl.gl)
   umpc.js      engine bicolink (+ fallback worker Python)
 public/
@@ -84,6 +97,7 @@ server.js      server statis + API untuk lokal
 ## Batasan
 
 - Link dengan captcha atau passcode tidak bisa diproses otomatis. Server akan menjawab dengan pesan error yang jelas.
+- Bicolink dilindungi Cloudflare. Kalau IP server yang dipakai sedang dinilai rendah, engine menolak lebih awal dengan pesan "sedang menantang request" (bukan menggantung sampai timeout). Solusinya pindah server atau tunggu beberapa menit.
 - Struktur halaman safelink bisa berubah kapan saja. Kalau gate tidak ditemukan, hasilnya error, bukan URL palsu.
 - Tidak ada database, tidak ada logging link.
 

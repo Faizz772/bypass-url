@@ -18,6 +18,18 @@ const DEFAULT_TIMEOUT_MS = 90000;
 
 const delay = (ms) => new Promise((r) => setTimeout(r, ms));
 
+function assertBicolink(url) {
+  let host = "";
+  try {
+    host = new URL(url).hostname;
+  } catch (e) {
+    throw new Error("URL tidak valid.");
+  }
+  if (!/(^|\.)(bicolink\.com|bico\.link)$/i.test(host)) {
+    throw new Error(`Host ${host} bukan bicolink. Engine umpc hanya menerima bicolink.com atau bico.link.`);
+  }
+}
+
 function nonceAnswer(nonce) {
   let sum = 0;
   for (let i = 0; i < nonce.length; i++) {
@@ -293,17 +305,49 @@ function toWorkerBody(body) {
   return { type: "urlencoded", data: String(body) };
 }
 
-function switchToPython(ctx, reason) {
-  const bin = findPython();
-  if (!bin) {
-    throw new Error(
-      "Cloudflare nge-challenge koneksi Node dan python3 tidak ditemukan di server. " +
-        "Install dulu (mis. apt install python3) atau pakai proxy."
+// CF-block biasanya memicu balapan antara fetch dan timeout. AbortSignal.timeout
+// tidak selalu membebaskan promise fetch, jadi guard kedua memaksa reject.
+function fetchWithDeadline(url, init, timeoutMs) {
+  let killer;
+  const guard = new Promise((_, reject) => {
+    killer = setTimeout(() => {
+      reject(new Error(`guard timeout ${timeoutMs}ms`));
+      if (init && init.controller) init.controller.abort();
+    }, Math.max(1500, Math.floor(timeoutMs * 0.9)));
+  });
+  const run = fetch(url, init).finally(() => clearTimeout(killer));
+  return Promise.race([run, guard]);
+}
+
+// Health check ringan: pastikan host shortlink terjangkau sebelum proses panjang.
+async function preflight(ctx, url) {
+  const host = new URL(url).hostname;
+  let res;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 12000);
+  try {
+    res = await fetchWithDeadline(
+      url,
+      { method: "GET", headers: { "User-Agent": UA, Accept: "text/html" }, redirect: "manual", signal: controller.signal, controller },
+      12000
     );
+    const body = (await res.text()).slice(0, 4000);
+    const probe = normalizeFetch(res, body);
+    if (isCfBlock(probe)) {
+      throw new Error(
+        `Server ${host} sedang menantang request dari IP ini (HTTP ${res.status}). ` +
+          "Coba lagi beberapa menit, atau jalankan sendiri lewat server yang IP-nya tidak diblok."
+      );
+    }
+    if (res.status >= 500) throw new Error(`Server shortlink ${host} sedang error (HTTP ${res.status}).`);
+    ctx.jar.storeFromResponse(probe, url);
+    ctx.trace.push(`preflight ${host} -> ${res.status}`);
+  } catch (e) {
+    if (e.message.indexOf("menantang") >= 0 || e.message.indexOf("sedang error") >= 0) throw e;
+    throw new Error(`Server shortlink ${host} tidak merespons: ${e.message}`);
+  } finally {
+    clearTimeout(timer);
   }
-  ctx.transport = "python";
-  ctx.py = new PythonTransport(bin, ctx.proxy);
-  ctx.trace.push(`transport: fetch -> ${bin} (${reason})`);
 }
 
 async function perform(ctx, url, method, body, headers, timeoutMs) {
@@ -322,21 +366,27 @@ async function perform(ctx, url, method, body, headers, timeoutMs) {
     return r;
   }
 
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
   let res;
   try {
-    res = await fetch(url, { method, body, headers, redirect: "manual", signal: AbortSignal.timeout(timeoutMs) });
+    res = await fetchWithDeadline(
+      url,
+      { method, body, headers, redirect: "manual", signal: controller.signal, controller },
+      timeoutMs
+    );
   } catch (e) {
-    if (findPython()) {
-      switchToPython(ctx, "fetch error: " + e.message);
-      return perform(ctx, url, method, body, headers, timeoutMs);
-    }
-    throw e;
+    throw new Error(`Gagal menghubungi ${new URL(url).hostname}: ${e.message}`);
+  } finally {
+    clearTimeout(timer);
   }
   const text = await res.text();
   const r = normalizeFetch(res, text);
   if (isCfBlock(r)) {
-    switchToPython(ctx, `CF block HTTP ${r.status}`);
-    return perform(ctx, url, method, body, headers, timeoutMs);
+    throw new Error(
+      `Cloudflare tetap menantang request (HTTP ${r.status}, cf-ray ${r.headers.get("cf-ray") || "-"}). ` +
+        "IP server kemungkinan dinilai rendah, coba lagi nanti."
+    );
   }
   return r;
 }
@@ -483,6 +533,7 @@ async function bypassBicolink(url, options = {}) {
 
   try {
     const cleanUrl = String(url || "").replace(/\/+$/, "");
+    assertBicolink(cleanUrl);
     const slug = cleanUrl.split("/").pop() || "";
     if (!slug || !/^https?:\/\//i.test(cleanUrl)) throw new Error("URL shortlink tidak valid atau slug tidak ditemukan.");
 
@@ -491,6 +542,8 @@ async function bypassBicolink(url, options = {}) {
       if (!bin) throw new Error("python3 tidak ditemukan (dibutuhkan untuk mode proxy). Install: pkg install python");
       ctx.py = new PythonTransport(bin, proxy);
     }
+
+    await preflight(ctx, cleanUrl);
 
     const origin = new URL(cleanUrl).origin;
     const freeUrl = `${origin}/al/free/${slug}`;
