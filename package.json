@@ -1,0 +1,24 @@
+{
+  "name": "bypass-url",
+  "version": "1.0.0",
+  "private": false,
+  "description": "Bypass shortlink safelinku (sfl.gl) dan bicolink lewat satu web app sederhana.",
+  "main": "api/index.js",
+  "scripts": {
+    "dev": "node server.js",
+    "start": "node server.js",
+    "test:mgvt": "node -e \"require('./api/mgvt').bypass(process.argv[1],{}).then(r=>console.log(JSON.stringify(r,null,2)))\" https://sfl.gl/gOfplaB",
+    "test:umpc": "node api/umpc.js https://bicolink.com/wFFcZL"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "keywords": [
+    "bypass",
+    "safelink",
+    "shortlink",
+    "bicolink",
+    "sfl"
+  ],
+  "license": "MIT"
+}
